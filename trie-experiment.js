@@ -1,4 +1,4 @@
-var emptyArray = [];
+var emptyArray = new Array(16);
 var emptyTrieDispatch;
 
 function get(s) {
@@ -146,4 +146,4 @@ for(var i = 0; i < n; ++i) {
   sum += trie.get(s + i);
 }
 console.log("trie get time: ", Date.now() - t0, sum);
-trie.print(10);
+// trie.print(10);
