@@ -24,17 +24,16 @@ Trie.prototype._insert = function(arr, pos, val) {
 Trie.prototype.get = function(s) { 
   var arr = str2arr(s), len = arr.length, trie = this;
   for(var i = 0; i < len; ++i) { trie = trie.next(arr[i]); }
-  return trie.val();
+  return trie.val;
 };
 Trie.prototype.print = function(n) {
   this._print("", n);
 };
 Trie.prototype._print = function(s, n) {
   if(n <= 0) { return n; }
-  if(this.value !== undefined) { console.log(s, this.value); --n; }
+  if(this.val !== undefined) { console.log(s, this.val); --n; }
   return this.__print(s, n);
 };
-Trie.prototype.val = function() { return this.value; };
 
 function str2arr(s) {
   var arr = new Array(s.length);
@@ -43,30 +42,30 @@ function str2arr(s) {
   }
   return arr;
 }
-function addVal(o, val) { o.value = val; return o; }
+function addVal(o, val) { o.val = val; return o; }
 
-function EmptyTrie() {};
+function EmptyTrie(val) { this.val = val;};
 Object.assign(EmptyTrie.prototype, Trie.prototype);
 EmptyTrie.prototype.next = function(c) { return emptyTrie; }
-EmptyTrie.prototype.add = function(c, trie) { return new PrefixTrie(c, trie); }
+EmptyTrie.prototype.add = function(c, trie) { return new PrefixTrie(c, trie, this.val); }
 EmptyTrie.prototype.addVal = function(val) { return addVal(new EmptyTrie(), val); }
 EmptyTrie.prototype.__print = function(s, n) { return n};
 var emptyTrie = new EmptyTrie();
 
-function PrefixTrie(c, trie) { this.c = c; this.trie = trie; }
+function PrefixTrie(c, trie, val) { this.c = c; this.trie = trie; this.val = val; }
 Object.assign(PrefixTrie.prototype, Trie.prototype);
 PrefixTrie.prototype.next = function(c) { return c === this.c ? this.trie : emptyTrie; }
 PrefixTrie.prototype.add = function(c, trie) { 
   if(c === this.c) {
-    return new PrefixTrie(c, trie);
+    return new PrefixTrie(c, trie, this.val);
   } else {
-    return multiTrieAdd(multiTrieAdd(new MultiTrie(_emptyArr), this.c, this.trie), c, trie); 
+    return multiTrieAdd(multiTrieAdd(new MultiTrie(_emptyArr, this.val), this.c, this.trie), c, trie); 
   }
 }
-PrefixTrie.prototype.addVal = function(val) { return addVal(new PrefixTrie(this.c, this.trie), val); };
+PrefixTrie.prototype.addVal = function(val) { return addVal(new PrefixTrie(this.c, this.trie, this.val), val); };
 PrefixTrie.prototype._print = function(s, n) { return this.trie._print(s + String.fromCharCode(this.c), n); }
 
-function MultiTrie(arr) { this.arr = arr; }
+function MultiTrie(arr, val) { this.arr = arr; this.val = val; }
 function multiTrieAdd(multiTrie, c, trie) {
   prevArr = multiTrie.arr
   var hibits = (c >> 4);
@@ -78,8 +77,8 @@ function multiTrieAdd(multiTrie, c, trie) {
 }
 Object.assign(MultiTrie.prototype, Trie.prototype);
 MultiTrie.prototype.next = function(c) { return this.arr[c >> 4][c & 15]; }
-MultiTrie.prototype.add = function(c, trie) { return multiTrieAdd(new MultiTrie(this.arr), c, trie); }
-MultiTrie.prototype.addVal = function(val) { return addVal(new MultiTrie(this.arr), val); }
+MultiTrie.prototype.add = function(c, trie) { return multiTrieAdd(new MultiTrie(this.arr, this.val), c, trie); }
+MultiTrie.prototype.addVal = function(val) { return addVal(new MultiTrie(this.arr, this.val), val); }
 MultiTrie.prototype.__print = function(s, n) {
   for(var i = 0; i < 16; ++i) {
     for(var j = 0; j < 16; ++j) {
@@ -100,34 +99,36 @@ t.print();
 
 // ----------------
 
-var n = 11;
-s = "s"
+var n = 480000;
+function s(i) {
+  return "h" + i;
+}
 
 var t0 = Date.now();
 var o = {};
 for(var i = 0; i < n; ++i) {
-  o[s + i] = i;
+  o[s(i)] = i;
 }
 console.log("object insert time: ", Date.now() - t0);
 
 var t0 = Date.now();
 var trie = emptyTrie;
 for(var i = 0; i < n; ++i) {
-  trie = trie.insert(s + i , i);
+  trie = trie.insert(s(i) , i);
 }
 console.log("trie insert time: ", Date.now() - t0);
 
 var t0 = Date.now();
 var sum = 0;
 for(var i = 0; i < n; ++i) {
-  sum += o[s + i];
+  sum += o[s(i)];
 }
 console.log("object get time: ", Date.now() - t0, sum);
 
 var t0 = Date.now();
 var sum = 0;
 for(var i = 0; i < n; ++i) {
-  sum += trie.get(s + i);
+  sum += trie.get(s(i));
 }
 console.log("trie get time: ", Date.now() - t0, sum);
 
