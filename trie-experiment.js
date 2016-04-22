@@ -127,6 +127,13 @@ for(var i = 0; i < n; ++i) {
 console.log("object insert time: ", Date.now() - t0);
 
 var t0 = Date.now();
+var map = new Map();
+for(var i = 0; i < n; ++i) {
+  map.set(s + i, i);
+}
+console.log("Map insert time: ", Date.now() - t0);
+
+var t0 = Date.now();
 var trie = emptyTrieDispatch;
 for(var i = 0; i < n; ++i) {
   trie = trie.insert(s + i , i);
@@ -139,6 +146,13 @@ for(var i = 0; i < n; ++i) {
   sum += o[s + i];
 }
 console.log("object get time: ", Date.now() - t0, sum);
+
+var t0 = Date.now();
+var sum = 0;
+for(var i = 0; i < n; ++i) {
+  sum += map.get(s + i);
+}
+console.log("map get time: ", Date.now() - t0, sum);
 
 var t0 = Date.now();
 var sum = 0;
