@@ -1,3 +1,4 @@
+// # Init
 if(!Object.assign) {
   Object.assign = function(o1, o2) {
     for(a in o2) {
@@ -8,11 +9,15 @@ if(!Object.assign) {
   }
 }
 
-var n = 50000;
-var radix = 20;
-var maxLinearTrie = 30;
+var n = 1000000;
+var radix = 5;
+const useTree = false;
+const binsearch = true;
+var maxLinearTrie = 100;
 ////////////////////////////////////////////////////////////////////
 
+// # Trie
+// ## Trie-general
 function Trie() { throw "abstract"; }
 Trie.prototype.insert = function(s, val) { 
   return this._insert(str2arr(s), 0, val); 
@@ -41,6 +46,7 @@ Trie.prototype._print = function(s, n) {
     var c = list[i];
     n = this.next(c)._print(s + String.fromCharCode(c), n);
   }
+  return n;
 };
 
 function str2arr(s) {
@@ -51,7 +57,7 @@ function str2arr(s) {
   return arr;
 }
 
-//
+// ## Empty
 function EmptyTrie(val) { this.val = val;};
 Object.assign(EmptyTrie.prototype, Trie.prototype);
 EmptyTrie.prototype.next = function(c) { return emptyTrie; }
@@ -65,7 +71,7 @@ EmptyTrie.prototype.list = function() { return emptyList; };
 var emptyTrie = new EmptyTrie();
 var emptyList = [];
 
-//
+// ## Prefix
 function PrefixTrie(c, trie, val) { 
   this.c = c; this.trie = trie; this.val = val; 
 }
@@ -77,10 +83,14 @@ PrefixTrie.prototype.add = function(c, trie) {
   if(c === this.c) {
     return new PrefixTrie(c, trie, this.val);
   } else {
+    if(useTree) {
+    return (new TreeTrie(this.c, undefined, undefined, this.trie, this.val)).add(c, trie);
+    } else {
     if(c < this.c) {
       return new BinaryTrie(c, this.c, trie, this.trie, this.val);
     } else {
       return new BinaryTrie(this.c, c, this.trie, trie, this.val);
+    }
     }
   }
 };
@@ -89,7 +99,7 @@ PrefixTrie.prototype.addVal = function(val) {
 };
 PrefixTrie.prototype.list = function() { return [this.c]; };
 
-//
+// ## Binary
 function BinaryTrie(a, b, A, B, val) { 
   this.a = a, this.b = b, this.A = A, this.B = B, this.val = val;}
   Object.assign(BinaryTrie.prototype, Trie.prototype);
@@ -112,9 +122,10 @@ BinaryTrie.prototype.add = function(c, trie) {
 BinaryTrie.prototype.list = function() { return [this.a, this.b]; };
 
 
-//
+// ## Linear
 function LinearTrie(cs, tries, val) { this.cs = cs, this.tries = tries; this.val = val; }
 Object.assign(LinearTrie.prototype, Trie.prototype);
+if(!binsearch) {
 LinearTrie.prototype.next = function(c) {
   var cs = this.cs;
   for(var i = 0; i < cs.length; ++i) {
@@ -123,6 +134,28 @@ LinearTrie.prototype.next = function(c) {
     }
   }
   return emptyTrie;
+}
+} else {
+LinearTrie.prototype.next = function(c) {
+  var min = 0;
+  var max = this.cs.length - 1;
+  var arr = this.cs;
+  //console.log('binsearch', arr, c);
+  while(min <= max) {
+    var mid = (min + max >> 1);
+    var midc = arr[mid];
+    //console.log(min, max, midc);
+    if(midc=== c) {
+      return this.tries[mid];
+    }
+    if(c > midc) {
+      min = mid + 1;
+    } else {
+      max = mid - 1;
+    }
+  }
+  return emptyTrie;
+}
 }
 LinearTrie.prototype.add = function(c, trie) {
   var pos;
@@ -149,52 +182,7 @@ LinearTrie.prototype.add = function(c, trie) {
 };
 LinearTrie.prototype.list = function() { return this.cs; };
 
-//
-function EmptyTree() { this.depth = 0; }
-Object.assign(Tree.prototype, Trie.prototype);
-Tree.prototype.next = function(c) { return emptyTrie }
-Tree.prototype.add = function(c, trie) {
-  return new Tree(c, trie, emptyTree, emptyTree);
-}
-Tree.prototype.addVal = function(c, trie) { }
-Tree.prototype.list = function(acc) { return acc; }
-emptyTree = new EmptyTree();
-
-function Tree(c, trie, left, right) {
-  this.c = c; this.trie = trie;
-  this.left = left; this.right = right;
-}
-Object.assign(Tree.prototype, Trie.prototype);
-Tree.prototype.next = function(c) {
-  if(this.c === c) {
-    return this.trie;
-  }
-  if(c < this.c) {
-    return this.left.next(c);
-  } else {
-    return this.right.next(c);
-  }
-}
-Tree.prototype.add = function(c, trie) {
-  if(this.c === c) {
-    return new Tree(c, trie, this.left, this.right);
-  } 
-  var c0 = this.c;
-  var trie0 = this.trie;
-  var left, right;
-  if(c < this.c) {
-    left = this.left.add(c, trie);
-    right = this.right;
-  } else {
-    left = this.left;
-    right = this.right.add(c, trie);
-  }
-  return new Tree(c0, trie0, left, right);
-}
-Tree.prototype.addVal = function(c, trie) { }
-Tree.prototype.list = function(acc) {
-}
-
+// ## TrieTree
 function TreeTrie(c, left, right, trie, val) {
   this.c = c;
   this.left = left; 
@@ -205,16 +193,42 @@ function TreeTrie(c, left, right, trie, val) {
 
 Object.assign(TreeTrie.prototype, Trie.prototype);
 TreeTrie.prototype.next = function(c) { 
+  if(c === this.c) { return this.trie; }
+  var t = (c < this.c) ? this.left : this.right;
+  return t ? t.next(c) : emptyTrie;
 }
 TreeTrie.prototype.add = function(c, trie) { 
-  return new PrefixTrie(c, trie, this.val); 
+  if(c === this.c) {
+    return new TreeTrie(c, this.left, this.right, trie, this.val);
+  }
+  if(c < this.c) {
+    if(this.left) {
+      return new TreeTrie(this.c, this.left.add(c, trie), this.right, this.trie, this.left.val);
+    } else {
+      return new TreeTrie(c, undefined, this, trie, this.val);
+    }
+  } else {
+    if(this.right) {
+      return new TreeTrie(this.c, this.left, this.right.add(c, trie), this.trie, this.right.val);
+    } else {
+      return new TreeTrie(c, this, undefined, trie, this.val);
+    }
+  }
 }
 TreeTrie.prototype.addVal = function(val) { 
-  return new TreeTrie(val);
+  if(c === this.c) {
+    return new TreeTrie(this.c, this.left, this.right, this.trie, val);
+  }
 }
-TreeTrie.prototype.list = function() { return emptyList; };
+TreeTrie.prototype.list = function(acc) { 
+  if(!acc) { acc = []; }
+  if(this.left) { this.left.list(acc); }
+  acc.push(this.c);
+  if(this.right) { this.right.list(acc); }
+  return acc
+};
 
-//
+// ## Multi-16
 function makeMultiTrie(cs, tries, val) {
   var result = new MultiTrie(_emptyArr, val);
   for(var i = 0; i < cs.length; ++i) {
@@ -249,25 +263,21 @@ var _et = emptyTrie;
 _e = [_et, _et, _et, _et, _et, _et, _et, _et, _et, _et, _et, _et, _et, _et, _et, _et] 
 _emptyArr = [_e, _e, _e, _e, _e, _e, _e, _e,_e, _e, _e, _e, _e, _e, _e, _e];
 
-t = emptyTrie.insert('hello', 1);
-t = t.insert('world', 2);
-t = t.insert('word', 3);
-//t = t.insert('ba', 2);
-t.print(10);
-
+// # test
 // ----------------
 
 function s(i) {
-  /*
+  if(false) {
   result = 'hello';
   while(i) {
     result += String.fromCharCode(65 + (i % radix));
     i = (i / radix) |0;
   }
 
-  //return result;
-  //*/
+  return result;
+  } else {
   return "h" + i;
+  }
 
 }
 
@@ -277,6 +287,15 @@ for(var i = 0; i < n; ++i) {
   o[s(i)] = i;
 }
 console.log("object insert time: ", Date.now() - t0);
+
+if(typeof Immutable !== "undefined") {
+var t0 = Date.now();
+var map = Immutable.Map();
+for(var i = 0; i < n; ++i) {
+  map = map.set(s(i), i);
+}
+console.log("immutable map insert time: ", Date.now() - t0);
+}
 
 var t0 = Date.now();
 var trie = emptyTrie;
@@ -292,6 +311,16 @@ for(var i = 0; i < n; ++i) {
 }
 console.log("object get time: ", Date.now() - t0, sum);
 
+if(typeof Immutable !== "undefined") {
+var t0 = Date.now();
+var sum = 0;
+for(var i = 0; i < n; ++i) {
+  sum += map.get(s(i));
+}
+console.log("immutable get time: ", Date.now() - t0, sum);
+}
+
+
 var t0 = Date.now();
 var sum = 0;
 for(var i = 0; i < n; ++i) {
@@ -299,6 +328,6 @@ for(var i = 0; i < n; ++i) {
 }
 console.log("trie get time: ", Date.now() - t0, sum);
 
-//trie.print(30);
+//trie.print(20);
 /*
 */
