@@ -9,10 +9,11 @@ if(!Object.assign) {
   }
 }
 
-var n = 300000;
+var n = 1000000;
 var repeat = 1;
 radix = 2;
-const reverseOrder = false;
+var strPrefix = "hello";
+const reverseOrder = true;
 ////////////////////////////////////////////////////////////////////
 //console.log('+'.charCodeAt(0));
 // # ToArray
@@ -380,7 +381,7 @@ var str2arr = function(buf, s) {
           }
           i = (i / radix) |0;
         }
-      return result;
+      return strPrefix + result;
     }
 
     var t = [];
@@ -400,7 +401,9 @@ var str2arr = function(buf, s) {
         sum += trie.get(s(i));
       }
     }
+
     t.push(Date.now() - t0); t0 = Date.now();
+    t.push("obj");
     for(var j = 0; j < repeat; ++j) {
       var o = {};
       for(var i = 0; i < n; ++i) {
@@ -415,6 +418,52 @@ var str2arr = function(buf, s) {
       }
     }
     t.push(Date.now() - t0); t0 = Date.now();
+
+if(typeof Immutable !== "undefined") {
+    t.push("imm");
+
+    for(var j = 0; j < repeat; ++j) {
+      var map = Immutable.Map();
+      var o = {};
+      for(var i = 0; i < n; ++i) {
+        map = map.set(s(i), i);
+      }
+    }
+    t.push(Date.now() - t0); t0 = Date.now();
+    for(var j = 0; j < repeat; ++j) {
+      var sum2 = 0;
+      for(var i = 0; i < n; ++i) {
+        sum2 += map.get(s(i));
+      }
+    }
+    t.push(Date.now() - t0); t0 = Date.now();
+
+}
+
+if(typeof Immutable !== "undefined") {
+    t.push("mori");
+
+    for(var j = 0; j < repeat; ++j) {
+      var map = mori.hashMap();
+      var o = {};
+      for(var i = 0; i < n; ++i) {
+        map = mori.assoc(map, s(i), i);
+      }
+    }
+    t.push(Date.now() - t0); t0 = Date.now();
+    for(var j = 0; j < repeat; ++j) {
+      var sum2 = 0;
+      for(var i = 0; i < n; ++i) {
+        sum2 += mori.get(map, s(i));
+      }
+    }
+    t.push(Date.now() - t0); t0 = Date.now();
+
+}
+
+
+
+
     console.log("time: ", t, n, reverseOrder && radix, sum);
     /*
        if(radix < 200) {
