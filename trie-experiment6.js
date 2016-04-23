@@ -21,61 +21,62 @@ var converterFloat = new Float64Array(converter);
 var converterBytes = new Uint8Array(converter);
 //console.log('"'.charCodeAt(0));
 // ## toArray
-function toArray(o) {
+function toArray(buf, o) {
+  var pos = 0;
   var result = [];
+  function pushInt(n) {
+    if(n >= 128) { pushInt(n >> 7); }
+    buf[pos++] = ( (n & 127) | 128);
+  }
   function toArray(o) {
-    function pushInt(n) {
-      if(n >= 128) { pushInt(n >> 7); }
-      result.push( (n & 127) | 128);
-    }
     if(typeof o === "string") {
-      result.push(39);
+      buf[pos++] = (39);
       for(var i = 0; i < o.length; ++i) {
         var num = o.charCodeAt(i) || 65536;
-        if(num >= 128) { pushInt(num); result.push(num & 127); } else { result.push(num); }
+        if(num >= 128) { pushInt(num); buf[pos++] = (num & 127); } else { buf[pos++] = (num); }
       }
-      result.push(0);
+      buf[pos++] = (0);
     } else if(Array.isArray(o)) {
-      result.push(91);
+      buf[pos++] = (91);
       num = o.length;
-      //if(num >= 128) { pushInt(num); result.push(num & 127); } else { result.push(num); }
+      //if(num >= 128) { pushInt(num); buf[pos++] = (num & 127); } else { buf[pos++] = (num); }
       for(var i = 0; i < num; ++i) {
         toArray(o[i], result);
       }
-      result.push(93);
+      buf[pos++] = (93);
     } else if(typeof o === "number") {
       if(o === (o|0)) {
         if(o >= 0) {
-          result.push(43);
-          if(o >= 128) { pushInt(o); result.push(o & 127); } else { result.push(o); }
+          buf[pos++] = (43);
+          if(o >= 128) { pushInt(o); buf[pos++] = (o & 127); } else { buf[pos++] = (o); }
         } else {
-          result.push(45);
+          buf[pos++] = (45);
           o = -o;
-          if(o >= 128) { pushInt(o); result.push(o & 127); } else { result.push(o); }
+          if(o >= 128) { pushInt(o); buf[pos++] = (o & 127); } else { buf[pos++] = (o); }
         }
       } else {
-        result.push(46);
+        buf[pos++] = (46);
         converterFloat[0] = o;
-        result.push(converterBytes[0]);
-        result.push(converterBytes[1]);
-        result.push(converterBytes[2]);
-        result.push(converterBytes[3]);
-        result.push(converterBytes[4]);
-        result.push(converterBytes[5]);
-        result.push(converterBytes[6]);
-        result.push(converterBytes[7]);
+        buf[pos++] = (converterBytes[0]);
+        buf[pos++] = (converterBytes[1]);
+        buf[pos++] = (converterBytes[2]);
+        buf[pos++] = (converterBytes[3]);
+        buf[pos++] = (converterBytes[4]);
+        buf[pos++] = (converterBytes[5]);
+        buf[pos++] = (converterBytes[6]);
+        buf[pos++] = (converterBytes[7]);
       }
     } else if(typeof o === "object") {
-      result.push(123);
+      buf[pos++] = (123);
       for(var key in o) {
         toArray(key, result);
         toArray(o[key], result);
       }
-      result.push(125);
+      buf[pos++] = (125);
     }
   }
   toArray(o);
-  return result;
+  return pos;
 }
 // ## fromArray
 function fromArray(arr) {
@@ -142,14 +143,13 @@ function fromArray(arr) {
   */
 
 // ## str2arr
-var str2arr = function(s) {
+var str2arr = function(buf, s) {
     if(typeof s === 'string') {
-      var arr = new Array(s.length+1);
-      arr[0] = 123;
+      buf[0] = 123;
       for(var i = 0; i < s.length; ++i) {
-        arr[i + 1] = s.charCodeAt(i);
+        buf[i + 1] = s.charCodeAt(i);
       }
-      return arr;
+      return i + 1;
     }
   }
 //var str2arr = toArray;
@@ -172,7 +172,8 @@ var str2arr = function(s) {
     timings.push(json.length);
 
     for(var i = 0; i < n; ++i) {
-      var binary = toArray(o);
+      var binary = [];
+      toArray(binary, o);
     }
     timings.push(Date.now() - t0); t0 = Date.now();
 
@@ -182,29 +183,32 @@ var str2arr = function(s) {
     timings.push(Date.now() - t0); t0 = Date.now();
     timings.push(binary.length);
 
-    console.log(timings);
+    console.log(timings, JSON.stringify(o) === JSON.stringify(fromArray(binary)));
   }
   // # Trie
   // ## Trie-general
+  var buffer = new Array(100);
   function Trie() { throw "abstract"; }
-  Trie.prototype._insert = function(arr, pos, val) {
-    if(pos < arr.length) {
+  Trie.prototype._insert = function(arr, pos, len, val) {
+    if(pos < len) {
       var c = arr[pos];
-      return this.add(c, this.next(c)._insert(arr, pos + 1, val));
+      return this.add(c, this.next(c)._insert(arr, pos + 1, len, val));
     } else {
       return this.addVal(val);
     }
   }
   Trie.prototype.insert = function(s, val) { 
-    return this._insert(str2arr(s), 0, val); 
+    var len = str2arr(buffer, s);
+    return this._insert(buffer, 0, len, val); 
   }
-  Trie.prototype._get = function(arr, pos) { 
-    return pos === arr.length
+  Trie.prototype._get = function(arr, len, pos) { 
+    return pos === len
       ? this.val
-      : this.next(arr[pos])._get(arr, pos + 1);
+      : this.next(arr[pos])._get(arr, len, pos + 1);
   };
   Trie.prototype.get = function(s) { 
-    return this._get(str2arr(s), 0);
+    var len = str2arr(buffer, s);
+    return this._get(buffer, len, 0);
   };
   Trie.prototype.print = function(n) {
     this._print("", n || 1000000000);
@@ -370,9 +374,9 @@ var str2arr = function(s) {
       var j = i
         while(i) {
           if(reverseOrder) {
-            result = result + String.fromCharCode((i % radix));
+            result = result + String.fromCharCode(1+(i % radix));
           } else {
-            result = String.fromCharCode((i % radix)) + result;
+            result = String.fromCharCode(1+(i % radix)) + result;
           }
           i = (i / radix) |0;
         }
