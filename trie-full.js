@@ -1,7 +1,9 @@
 (function() {
   "use strict";
   var bon = require('./bon');
-  var str2arr = bon.str2arr;
+
+  var any2arr = bon.any2arr;
+  //var str2arr = bon.str2arr;
 
   if(!Object.assign) {
     Object.assign = function(o1, o2) {
@@ -25,17 +27,16 @@
     }
   }
   Trie.prototype.insert = function(s, val) {
-    var len = str2arr(buffer, s);
+    var len = any2arr(buffer, 0, s);
     return this._insert(buffer, 0, len, val);
   }
-  Trie.prototype._get = function(arr, len, pos) {
-    return pos === len
-      ? this.val
-      : this.next(arr[pos])._get(arr, len, pos + 1);
-  };
   Trie.prototype.get = function(s) {
-    var len = str2arr(buffer, s);
-    return this._get(buffer, len, 0);
+    var len = any2arr(buffer, 0, s);
+    var o = this;
+    for(var i = 0; i < len; ++i) {
+      o = o.next(buffer[i]);
+    }
+    return o.val;
   };
   Trie.prototype.print = function(n) {
     this._print("", n || 1000000000);
@@ -66,8 +67,8 @@
   var emptyList = [];
 
   // ## Prefix
-  function PrefixTrie(c, trie, val) {
-    this.c = c; this.trie = trie; this.val = val;
+  function PrefixTrie(c, trie) {
+    this.c = c; this.trie = trie;
   }
   Object.assign(PrefixTrie.prototype, Trie.prototype);
   PrefixTrie.prototype.next = function(c) {
@@ -75,44 +76,37 @@
   }
   PrefixTrie.prototype.add = function(c, trie) {
     if(c === this.c) {
-      return new PrefixTrie(c, trie, this.val);
+      return new PrefixTrie(c, trie);
     } else {
       if(c < this.c) {
-        return new BinaryTrie(c, this.c, trie, this.trie, this.val);
+        return new BinaryTrie(c, this.c, trie, this.trie);
       } else {
-        return new BinaryTrie(this.c, c, this.trie, trie, this.val);
+        return new BinaryTrie(this.c, c, this.trie, trie);
       }
     }
-  };
-  PrefixTrie.prototype.addVal = function(val) {
-    return new PrefixTrie(this.c, this.trie, this.val);
   };
   PrefixTrie.prototype.list = function() { return [this.c]; };
 
   // ## Binary
-  function BinaryTrie(a, b, A, B, val) {
-    this.a = a, this.b = b, this.A = A, this.B = B, this.val = val;}
+  function BinaryTrie(a, b, A, B) {
+    this.a = a, this.b = b, this.A = A, this.B = B;}
   Object.assign(BinaryTrie.prototype, Trie.prototype);
   BinaryTrie.prototype.next = function(c) {
     return this.a === c ? this.A : (this.b === c ? this.B : emptyTrie);
   }
-  BinaryTrie.prototype.addVal = function(val) {
-    return new BinaryTrie(this.a, this.b, this.A, this.B, this.val);
-  };
   BinaryTrie.prototype.add = function(c, trie) {
     if(this.a === c) {
-      return new BinaryTrie(this.a, this.b, trie, this.B, this.val);
+      return new BinaryTrie(this.a, this.b, trie, this.B);
     }
     if(this.b === c) {
-      return new BinaryTrie(this.a, this.b, this.A, trie, this.val);
+      return new BinaryTrie(this.a, this.b, this.A, trie);
     }
-    return new LinearTrie([this.a, this.b],
-        [this.A, this.B], this.val).add(c, trie);
+    return new LinearTrie([this.a, this.b], [this.A, this.B]).add(c, trie);
   };
   BinaryTrie.prototype.list = function() { return [this.a, this.b]; };
 
   // ## Linear
-  function LinearTrie(cs, tries, val) { this.cs = cs, this.tries = tries; this.val = val; }
+  function LinearTrie(cs, tries) { this.cs = cs, this.tries = tries; }
   Object.assign(LinearTrie.prototype, Trie.prototype);
   LinearTrie.prototype.next = function(c) {
     var arr = this.cs, min = 0, max = arr.length - 1;
@@ -141,7 +135,7 @@
     if(cs[pos] === c) {
       tries = tries.slice();
       tries[pos] = trie;
-      return new LinearTrie(cs, tries, this.val);
+      return new LinearTrie(cs, tries);
     }
 
     var len = cs.length + 1;
@@ -152,14 +146,13 @@
     cs = cs1; tries = tries1;
 
     return (cs.length >= 50 )
-      ? makeMultiTrie(cs, tries, this.val)
-      : new LinearTrie(cs, tries, this.val);
+      ? makeMultiTrie(cs, tries)
+      : new LinearTrie(cs, tries);
   };
-  LinearTrie.prototype.addVal = function(val) { return new LinearTrie(this.cs, this.tries, val); };
   LinearTrie.prototype.list = function() { return this.cs; };
 
   // ## Multi-16
-  function makeMultiTrie(cs, tries, val) {
+  function makeMultiTrie(cs, tries) {
     var arr = _emptyArr.slice();
     for(var i = 0; i < cs.length; ++i) {
       var c = cs[i];
@@ -168,9 +161,9 @@
       var loArr = arr[hibits] = arr[hibits].slice();
       loArr[c & 15] = trie;
     }
-    return new MultiTrie(arr, val);
+    return new MultiTrie(arr);
   }
-  function MultiTrie(arr, val) { this.arr = arr; this.val = val; }
+  function MultiTrie(arr) { this.arr = arr; }
   Object.assign(MultiTrie.prototype, Trie.prototype);
   MultiTrie.prototype.next = function(c) { return this.arr[c >> 4][c & 15]; }
   MultiTrie.prototype.add = function(c, trie) {
@@ -179,9 +172,8 @@
     var arr = prevArr.slice();
     var loArr = arr[hibits] = prevArr[hibits].slice();
     loArr[c & 15] = trie;
-    return new MultiTrie(arr, this.val);
+    return new MultiTrie(arr);
   }
-  MultiTrie.prototype.addVal = function(val) { return new MultiTrie(this.arr, this.val); };
   MultiTrie.prototype.list = function() {
     result = [];
     for(var i = 0; i < 16; ++i) {
