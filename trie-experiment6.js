@@ -9,7 +9,7 @@ if(!Object.assign) {
   }
 }
 
-var n = 1000000;
+var n = 100000;
 var repeat = 1;
 radix = 2;
 var strPrefix = "hello";
@@ -21,113 +21,171 @@ var converter = new ArrayBuffer(8);
 var converterFloat = new Float64Array(converter);
 var converterBytes = new Uint8Array(converter);
 //console.log('"'.charCodeAt(0));
-// ## toArray
-function toArray(buf, o) {
-  var pos = 0;
-  var result = [];
-  function pushInt(n) {
-    if(n >= 128) { pushInt(n >> 7); }
-    buf[pos++] = ( (n & 127) | 128);
+  // ## str2arr / toBon
+  function pushVB(buf, pos, n) { // ###
+    var pos0 = pos;
+    buf[pos] = n & 127;
+    if(n > 127) {
+      do {
+        n = n >> 7;
+        buf[++pos] = 128 | n;
+      } while(n > 127);
+      var pos1 = pos;
+      while(pos0 < pos1) {
+        var t = buf[pos0]; 
+        buf[pos0] = buf[pos1]; 
+        buf[pos1] = t;
+        ++pos0; --pos1;
+      }
+    }
+    return ++pos;
   }
-  function toArray(o) {
-    if(typeof o === "string") {
-      buf[pos++] = (39);
+  function pushNVB(buf, pos, n) { // ###
+    var pos0 = pos;
+    buf[pos] = ~(n & 127);
+    if(n > 127) {
+      do {
+        n = n >> 7;
+        buf[++pos] = ~(128 | n);
+      } while(n > 127);
+      var pos1 = pos;
+      while(pos0 < pos1) {
+        var t = buf[pos0]; 
+        buf[pos0] = buf[pos1]; 
+        buf[pos1] = t;
+        ++pos0; --pos1;
+      }
+    }
+    return ++pos;
+  }
+  var any2arr = function(buf, pos, o) { // ###
+    // types:
+    // 1. string
+    // 2. negative integer
+    // 3. positive integer
+    // 4. double
+    // 5. array/list
+    // 6. object/map
+    // ... keyword, buffer, true, false, null ...
+    if(typeof o === 'string') { // ###
+      buf[pos++] = 1;
       for(var i = 0; i < o.length; ++i) {
-        var num = o.charCodeAt(i) || 65536;
-        if(num >= 128) { pushInt(num); buf[pos++] = (num & 127); } else { buf[pos++] = (num); }
-      }
-      buf[pos++] = (0);
-    } else if(Array.isArray(o)) {
-      buf[pos++] = (91);
-      num = o.length;
-      //if(num >= 128) { pushInt(num); buf[pos++] = (num & 127); } else { buf[pos++] = (num); }
-      for(var i = 0; i < num; ++i) {
-        toArray(o[i], result);
-      }
-      buf[pos++] = (93);
-    } else if(typeof o === "number") {
-      if(o === (o|0)) {
-        if(o >= 0) {
-          buf[pos++] = (43);
-          if(o >= 128) { pushInt(o); buf[pos++] = (o & 127); } else { buf[pos++] = (o); }
+        var c = o.charCodeAt(i) + 1;
+        if(c < 128) {
+          buf[pos++] = c;
         } else {
-          buf[pos++] = (45);
-          o = -o;
-          if(o >= 128) { pushInt(o); buf[pos++] = (o & 127); } else { buf[pos++] = (o); }
+          pushVB(c);
+        }
+      }
+      buf[pos++] = 0;
+    } else if(typeof o === 'number') { // ###
+      if((o | 0) === o) {
+        if(o < 0) {
+          buf[pos++] = 2;
+          pos = pushNVB(buf, pos, o);
+        } else {
+          buf[pos++] = 3;
+          pos = pushVB(buf, pos, o);
         }
       } else {
-        buf[pos++] = (46);
+        buf[pos++] = 4;
         converterFloat[0] = o;
-        buf[pos++] = (converterBytes[0]);
-        buf[pos++] = (converterBytes[1]);
-        buf[pos++] = (converterBytes[2]);
-        buf[pos++] = (converterBytes[3]);
-        buf[pos++] = (converterBytes[4]);
-        buf[pos++] = (converterBytes[5]);
-        buf[pos++] = (converterBytes[6]);
-        buf[pos++] = (converterBytes[7]);
+        for(var i = 0; i < 8; ++i) {
+          buf[pos++] = converterBytes[i];
+        }
       }
-    } else if(typeof o === "object") {
-      buf[pos++] = (123);
-      for(var key in o) {
-        toArray(key, result);
-        toArray(o[key], result);
+    } else if(Array.isArray(o)) { // ###
+      buf[pos++] = 5;
+      for(var i = 0; i < o.length; ++i) {
+        pos = any2arr(buf, pos, o[i]);
       }
-      buf[pos++] = (125);
+      buf[pos++] = 0;
+    } else if(o.constructor === Object) { // ###
+        buf[pos++] = 6;
+        for(var key in o) {
+          pos = any2arr(buf, pos, key);
+          pos = any2arr(buf, pos, o[key]);
+        }
+        buf[pos++] = 0;
+    } else { // ###
+      throw {"unserialisable type": o};
+    }
+    return pos;
+  }
+  var str2arr = function(buf, s) { // ###
+    pos = any2arr(buf, 0, s);
+    while(!buf[--pos]) {};
+    return ++pos;
+  }
+  function toBon(o) { // ###
+    a = [];
+    any2arr(a, 0, o);
+    return a;
+  }
+  // ## fromBon
+  function popAny(buf) { // ###
+    switch(buf.arr[buf.pos++]) {
+      case 0: return popAny(buf);
+      case 1: return popStr(buf);
+      case 2: return popNeg(buf);
+      case 3: return popPos(buf);
+      case 4: return popDouble(buf);
+      case 5: return popArr(buf);
+      case 6: return popObj(buf);
     }
   }
-  toArray(o);
-  return pos;
-}
-// ## fromArray
-function fromArray(arr) {
-  var pos = 0;
-  function readInt() {
-    var c = arr[pos++];
-    return (c & 128) ? (c << 7) | readInt() : c;
-  }
-  function fromArray() {
-    switch(arr[pos++]) {
-      case 39: // '
-        var s = "";
-        while(arr[pos] !== 0) {
-          s += String.fromCharCode(readInt());
-        }
-        ++pos;
-        return s;
-      case 43: // +
-        return readInt();
-      case 45: // -
-        return - readInt();
-      case 46: // .
-        converterBytes[0] = arr[pos++];
-        converterBytes[1] = arr[pos++];
-        converterBytes[2] = arr[pos++];
-        converterBytes[3] = arr[pos++];
-        converterBytes[4] = arr[pos++];
-        converterBytes[5] = arr[pos++];
-        converterBytes[6] = arr[pos++];
-        converterBytes[7] = arr[pos++];
-        return converterFloat[0];
-      case 123: // {
-        var result = {}
-        while(arr[pos] !== 125) { // ]
-          var key = fromArray();
-          result[key] = fromArray();
-        }
-        ++pos;
-        return result;
-      case 91: // [
-        var result = [];
-        while(arr[pos] !== 93) { // ]
-          result.push(fromArray());
-        }
-        ++pos;
-        return result;
+  function popStr(buf) { // ###
+    var c, s = "";
+    while(c = popPos(buf)) {
+      s += String.fromCharCode(c - 1);
     }
-    }
-    return fromArray();
+    return s;
   }
+  function popNeg(buf) { // ###
+    var res = 0;
+    do {
+      var c = ~ buf.arr[buf.pos++];
+      res = (res << 7) | (c & 127);
+    } while(c & 128);
+    return -res;
+  }
+  function popPos(buf) { // ###
+    var res = 0;
+    do {
+      var c = buf.arr[buf.pos++];
+      res = (res << 7) | (c & 127);
+    } while(c & 128);
+    return res;
+  }
+  function popDouble(buf) { // ###
+    for(var i = 0; i < 8; ++i) {
+      converterBytes[i] = buf.arr[buf.pos++];
+    }
+    return converterFloat[0];
+  }
+  function popArr(buf) { // ###
+    var result = [];
+    while(buf.arr[buf.pos]) {
+      result.push(popAny(buf));
+    }
+    buf.pos++;
+    return result;
+  }
+  function popObj(buf) { // ###
+    var result = {};
+    while(buf.arr[buf.pos]) {
+      var key = popAny(buf);
+      result[key] = popAny(buf);
+    }
+    buf.pos++;
+    return result;
+  }
+  function fromBon(arr) { // ###
+    return popAny({arr:arr, pos:0});
+  }
+
+  // ## bench
+  if(true) {
   function arrToStr(arr) {
     var str = "";
     for(var i = 0; i < arr.length; ++i) {
@@ -136,27 +194,9 @@ function fromArray(arr) {
     return str
   }
 
-
   var o = [3, "hello", -1, 0, 100.1, [0.1,{"hi": ["hello", ["wo", "r", ["l", "d"],{a: 1, c: {b:-3}}, 1,-2,3, "!"]]}]];
-  /*
-  console.log(JSON.stringify(arrToStr(toArray(tests))))
-  console.log(JSON.stringify(fromArray(toArray(tests))));
-  */
+  //o = [123, 100.1];
 
-// ## str2arr
-var str2arr = function(buf, s) {
-    if(typeof s === 'string') {
-      buf[0] = 123;
-      for(var i = 0; i < s.length; ++i) {
-        buf[i + 1] = s.charCodeAt(i);
-      }
-      return i + 1;
-    }
-  }
-//var str2arr = toArray;
-
-  // ## bench
-  if(false) {
     var n = 100000;
     var timings = [];
     var s;
@@ -173,18 +213,19 @@ var str2arr = function(buf, s) {
     timings.push(json.length);
 
     for(var i = 0; i < n; ++i) {
-      var binary = [];
-      toArray(binary, o);
+      var binary = toBon(o);
     }
     timings.push(Date.now() - t0); t0 = Date.now();
+    console.log(JSON.stringify(arrToStr(binary)));
+    console.log(JSON.stringify(fromBon(binary)));
 
     for(var i = 0; i < n; ++i) {
-      fromArray(binary);
+      fromBon(binary);
     }
     timings.push(Date.now() - t0); t0 = Date.now();
     timings.push(binary.length);
 
-    console.log(timings, JSON.stringify(o) === JSON.stringify(fromArray(binary)));
+    console.log(timings, JSON.stringify(o) === JSON.stringify(fromBon(binary)));
   }
   // # Trie
   // ## Trie-general
@@ -419,47 +460,47 @@ var str2arr = function(buf, s) {
     }
     t.push(Date.now() - t0); t0 = Date.now();
 
-if(typeof Immutable !== "undefined") {
-    t.push("imm");
+    if(typeof Immutable !== "undefined") {
+      t.push("imm");
 
-    for(var j = 0; j < repeat; ++j) {
-      var map = Immutable.Map();
-      var o = {};
-      for(var i = 0; i < n; ++i) {
-        map = map.set(s(i), i);
+      for(var j = 0; j < repeat; ++j) {
+        var map = Immutable.Map();
+        var o = {};
+        for(var i = 0; i < n; ++i) {
+          map = map.set(s(i), i);
+        }
       }
-    }
-    t.push(Date.now() - t0); t0 = Date.now();
-    for(var j = 0; j < repeat; ++j) {
-      var sum2 = 0;
-      for(var i = 0; i < n; ++i) {
-        sum2 += map.get(s(i));
+      t.push(Date.now() - t0); t0 = Date.now();
+      for(var j = 0; j < repeat; ++j) {
+        var sum2 = 0;
+        for(var i = 0; i < n; ++i) {
+          sum2 += map.get(s(i));
+        }
       }
+      t.push(Date.now() - t0); t0 = Date.now();
+
     }
-    t.push(Date.now() - t0); t0 = Date.now();
 
-}
+    if(typeof Immutable !== "undefined") {
+      t.push("mori");
 
-if(typeof Immutable !== "undefined") {
-    t.push("mori");
-
-    for(var j = 0; j < repeat; ++j) {
-      var map = mori.hashMap();
-      var o = {};
-      for(var i = 0; i < n; ++i) {
-        map = mori.assoc(map, s(i), i);
+      for(var j = 0; j < repeat; ++j) {
+        var map = mori.hashMap();
+        var o = {};
+        for(var i = 0; i < n; ++i) {
+          map = mori.assoc(map, s(i), i);
+        }
       }
-    }
-    t.push(Date.now() - t0); t0 = Date.now();
-    for(var j = 0; j < repeat; ++j) {
-      var sum2 = 0;
-      for(var i = 0; i < n; ++i) {
-        sum2 += mori.get(map, s(i));
+      t.push(Date.now() - t0); t0 = Date.now();
+      for(var j = 0; j < repeat; ++j) {
+        var sum2 = 0;
+        for(var i = 0; i < n; ++i) {
+          sum2 += mori.get(map, s(i));
+        }
       }
-    }
-    t.push(Date.now() - t0); t0 = Date.now();
+      t.push(Date.now() - t0); t0 = Date.now();
 
-}
+    }
 
 
 
