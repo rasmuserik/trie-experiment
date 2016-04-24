@@ -1,11 +1,11 @@
 (function() {
   "use strict";
-  var emptyTrie = require('./trie');
+  var emptyTrie = require('./trie-full');
 
-  var radix = 2;
+  var radix = 20;
   function bench(radix, cacheHostile) {
-    var n = 40000;
-    var repeat = 10;
+    var n = 400000;
+    var repeat = 1;
     var strPrefix = "hello";
     function s(i) {
       var result = '';
