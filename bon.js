@@ -175,6 +175,7 @@
     }
     return str
   }
+  exports.any2arr = any2arr;
   exports.str2arr = str2arr;
   exports.toBon = toBon;
   exports.fromBon = fromBon;

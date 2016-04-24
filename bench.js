@@ -1,6 +1,6 @@
 (function() {
   "use strict";
-  var emptyTrie = require('./trie-full');
+  var emptyTrie = require(((typeof process === 'object'?process:{}).argv ||[])[2] || './trie-full2');
 
   var radix = 20;
   function bench(radix, cacheHostile) {
