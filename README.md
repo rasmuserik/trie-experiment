@@ -19,3 +19,17 @@ The following properties are desired:
 - Compact - the shorter the better, though for tradeofs it is generally a higher priority to be fast.
 - Different data types, - not only strings, but also integers, numbers, objects, arrays, ... should be encodeable
 - Order preserving. The lexicograhical sorted binary strings should preserver the order of the sorted strings, ie "hello" < "hi", and -10 < -5 < 20 < 300 < 1000.  For performance reason order of floating point numbers are not preserved.
+
+## Trie
+
+Nodes:
+
+- prefix-free strings are easily enforced, and thus data is only stored in leafs / empty nodes
+- special case for unary nodes and binary nodes for performance yields better performance
+- sorted-node ie. linear list of symbols, binary search during lookup.
+- 4+4-node, ie two levels of 16-entry tables (second level only allocated when needed). 
+
+Performance:
+
+- performance of 4+4 and linear nodes are quite similar, though for < 50 symbols linear are typically peforms better, and vice versa.
+- large performance degradation when linear nodes crosses the 127-symbol size on spidermonkey/firefox.
